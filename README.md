@@ -1,2 +1,2 @@
-# Sonoluminescence-Project
-Converting data from measuring sonolminescent light pulses into messages/images
+# Looping Pendulum Capture
+Analysing behaviour of masses on a looping pendulum using long exposure camera frames
