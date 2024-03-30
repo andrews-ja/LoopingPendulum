@@ -1,49 +1,117 @@
 # Python Modules
 import os
-import sys
-import numpy as np
+import math
 from pathlib import Path
 
 # Pip Libraries
 import cv2 as cv
+import numpy as np
+from PIL import Image
 
-# Paths
-from main import PathClass
-
-sys.path.append(str(Path(__file__).parent.parent.resolve()))
-sys.path += PathClass(Path(__file__).parent.parent).getStrPaths("CLASSES_DIR")
+global indent
+indent = '    '
 
 class MassTracker:
     def __innit__(
             self,
-            clbrImgPath: Path,
-            capPath: Path
+            colourRanges: dict,
+            clbrPath: str,
+            recordingPath: str
     ) -> None:
-        self.clbrImg = cv.imread(clbrImgPath, cv.IMREAD_COLOR)
-        assert self.clbrImg.size() > 0, f"img not found at path: {clbrImgPath}"
-
-        self.cap = cv.VideoCapture(capPath)
-        assert self.cap.isOpened(), f"video not found at path: {capPath}"
-
-    def calbirate(self):
-        pass
+        self.colourRanges = colourRanges
+        self.clbrPath = clbrPath
+        self.recordingPath = recordingPath
     
-    def _processFrame(self, cap: cv.VideoCapture):
-        ret, frame = cap.read()
-        assert ret, "Could not read frame"
+    def _findColour(
+        self,
+        frame: np.ndarray,
+        colour: str
+    ) -> tuple[int, int, int, int] | None:
 
         frameHSV = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
 
-        redMask0 = cv.inRange(frameHSV, np.array([0,50,50]), np.array([10,255,255]))
-        redMask1 = cv.inRange(frameHSV, np.array([170,50,50]), np.array([180,255,255]))
-        greenMask = cv.inRange(frameHSV, (36, 25, 25), (70, 255,255))
+        for range in self.colourRanges:
+            if range == colour:
+                mask += cv.inRange(frameHSV, range[0], range[1])
 
-        fullMask = redMask0 + redMask1 + greenMask
+        # (x1, y1, x2, y2)
+        BBox = Image.fromarray(mask).getbbox()
 
-        filteredFrame = cv.bitwise_and(frameHSV, frameHSV, mask=fullMask)
+        return BBox
+        
+    def calbirate(
+        self,
+        clbrColour: str,
+        clbrSize: int
+    ) -> int:
+        ppmList: list[float] = []
 
-    def closeCap(self) -> int:
-        try:
-            self.cap.release(); return 1
-        except Exception as e:
-            print(f"Capture did not close: {e}"); return 0
+        print("Looking for images in: '%s'..." % self.clbrPath)
+        for file in next(os.walk(self.clbrPath)):
+            print(indent + "File found: '%s'" % file)
+
+            filetype = file.split('.')[-1]
+
+            if filetype in ['jpeg', 'jpg', 'png']:   
+                img = cv.imread(self.clbrPath, cv.IMREAD_COLOR)
+                clbrBBox = self._findColour(img, clbrColour) # (x1, y1, x2, y2)
+
+                if clbrBBox:
+                    ppm = math.hypot(clbrBBox[0] + clbrBBox[2], clbrBBox[1] + clbrBBox[3]) / clbrSize
+                    ppmList.append(ppm)
+                    print(indent*2 + "Value added: %s" % ppm)
+                else:
+                    print(indent*2 + "Error: Calibration box not found"); return -1
+
+            else:
+                print(indent + "Error: Invalid filetype: %s" % filetype); return -1
+
+        avgPpm = sum(ppmList)/len(ppmList)
+
+        if avgPpm > 0:
+            print("Tracker calibrated ==> pixles * meter^-1 = %s\n" %avgPpm)
+            return avgPpm
+        
+        print("Error: No files found"); return -1
+
+    def processRecordings(
+        self,
+        m1Colour: str,
+        m2Colour: str,
+    ) -> tuple[
+        list[tuple[int, int]],
+        list[tuple[int, int]]
+        ]:
+        m1Pos, m2Pos = [], []
+
+        print("Searching for recordings in: '%s'..." % self.recordingPath)
+        for file in next(os.walk(self.recordingPath)):
+            print(indent + "Analysing recording: '%s'..." % file)
+
+            filetype = file.split('.')[-1]
+
+            if filetype in ['mp4', 'avi']:
+                cap = cv.VideoCapture(file)
+                assert self.cap.isOpened(), indent + "Error: Cannot open recording %s" % file
+
+                ret, frame = cap.read()
+                assert ret, indent*2 + "Error: Could not read frame"
+
+                m1BBox = self._findColour(frame, m1Colour)
+                m2BBox = self._findColour(frame, m2Colour)
+
+                getCoords: tuple[int, int] = lambda BBox: ((BBox[0] + BBox[2])/2 , (BBox[1] + BBox[3])/2) # (x, y)
+
+                m1Pos.append(getCoords(m1BBox))
+                m2Pos.append(getCoords(m2BBox))
+
+                print(indent*2 + "Data added")
+
+                try:
+                    self.cap.release()
+                    return (m1Pos, m2Pos)
+                except Exception as e:
+                    print(indent*2 + "Error: Capture %s did not close: %s" % file, e); return -1
+
+        print(indent + "Experiment analysed: %s\n" % self.recordingPath)
+    print("Media processed ==> Data saved")
