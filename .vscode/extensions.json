@@ -1,9 +1,13 @@
 {
-    // Extension identifier format: ${publisher.${name}
+  // Extension identifier format: ${publisher.${name}
 
-    // List of extensions which should be recommended for users of  this workspace
-    "recommendations": ["aaron-bond.better-comments"],
+  // List of extensions which should be recommended for users of  this workspace
+  "recommendations": [
+    "aaron-bond.better-comments",
+    "esbenp.prettier-vscode",
+    "janisdd.vscode-edit-csv"
+  ],
 
-    // List of extensions by VS Code which should not be recommended for users of this workspace
-    "unwantedRecommendations": []
+  // List of extensions by VS Code which should not be recommended for users of this workspace
+  "unwantedRecommendations": []
 }

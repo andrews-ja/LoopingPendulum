@@ -1,31 +1,27 @@
-# Python Modules
+# Python modules
 import os
 import math
 from pathlib import Path
 
-# Pip Libraries
+# Pip libraries
 import cv2 as cv
 import numpy as np
 from PIL import Image
 
-global indent
-indent = '    '
+indent = "    "
+
 
 class MassTracker:
     def __innit__(
-            self,
-            colourRanges: dict,
-            clbrPath: str,
-            recordingPath: str
+        self,
+        colourRanges: dict,
+        clbrPath: str,
     ) -> None:
         self.colourRanges = colourRanges
         self.clbrPath = clbrPath
-        self.recordingPath = recordingPath
-    
+
     def _findColour(
-        self,
-        frame: np.ndarray,
-        colour: str
+        self, frame: np.ndarray, colour: str
     ) -> tuple[int, int, int, int] | None:
 
         frameHSV = cv.cvtColor(frame, cv.COLOR_BGR2HSV)
@@ -38,80 +34,87 @@ class MassTracker:
         BBox = Image.fromarray(mask).getbbox()
 
         return BBox
-        
-    def calbirate(
-        self,
-        clbrColour: str,
-        clbrSize: int
-    ) -> int:
+
+    def calbirate(self, clbrColour: str, clbrSize: int) -> float:
         ppmList: list[float] = []
 
         print("Looking for images in: '%s'..." % self.clbrPath)
-        for file in next(os.walk(self.clbrPath)):
+        for _, _, file in next(os.walk(self.clbrPath)):
             print(indent + "File found: '%s'" % file)
 
-            filetype = file.split('.')[-1]
+            fileType = file.split(".")[-1]
 
-            if filetype in ['jpeg', 'jpg', 'png']:   
+            if fileType in ["jpeg", "jpg", "png"]:
                 img = cv.imread(self.clbrPath, cv.IMREAD_COLOR)
-                clbrBBox = self._findColour(img, clbrColour) # (x1, y1, x2, y2)
+                clbrBBox = self._findColour(img, clbrColour)  # (x1, y1, x2, y2)
 
                 if clbrBBox:
-                    ppm = math.hypot(clbrBBox[0] + clbrBBox[2], clbrBBox[1] + clbrBBox[3]) / clbrSize
+                    ppm = (
+                        math.hypot(clbrBBox[0] + clbrBBox[2], clbrBBox[1] + clbrBBox[3])
+                        / clbrSize
+                    )
                     ppmList.append(ppm)
-                    print(indent*2 + "Value added: %s" % ppm)
+                    print(indent * 2 + "Value added: %s" % ppm)
                 else:
-                    print(indent*2 + "Error: Calibration box not found"); return -1
-
+                    print(indent * 2 + "Error: Calibration box not found")
+                    return -1
             else:
-                print(indent + "Error: Invalid filetype: %s" % filetype); return -1
+                print(indent + "Error: Invalid fileType: %s" % fileType)
+                return -1
 
-        avgPpm = sum(ppmList)/len(ppmList)
+        avgPpm = sum(ppmList) / len(ppmList)
 
         if avgPpm > 0:
-            print("Tracker calibrated ==> pixles * meter^-1 = %s\n" %avgPpm)
+            print("Tracker calibrated ==> pixles * meter^-1 = %s\n" % avgPpm)
             return avgPpm
-        
-        print("Error: No files found"); return -1
+
+        print("Error: No files found")
+        return -1
 
     def processRecordings(
         self,
+        filePath: str,
         m1Colour: str,
         m2Colour: str,
-    ) -> tuple[
-        list[tuple[int, int]],
-        list[tuple[int, int]]
-        ]:
+    ) -> tuple[list, list] | None:
         m1Pos, m2Pos = [], []
 
-        print("Searching for recordings in: '%s'..." % self.recordingPath)
-        for file in next(os.walk(self.recordingPath)):
-            print(indent + "Analysing recording: '%s'..." % file)
+        experimentPath, fileName = filePath.split("/")[-2:]
 
-            filetype = file.split('.')[-1]
+        print("Searching for recordings in: '%s'..." % experimentPath)
+        print(indent + "Analysing recording: '%s'..." % fileName)
 
-            if filetype in ['mp4', 'avi']:
-                cap = cv.VideoCapture(file)
-                assert self.cap.isOpened(), indent + "Error: Cannot open recording %s" % file
+        fileType = fileName.split(".")[-1]
 
-                ret, frame = cap.read()
-                assert ret, indent*2 + "Error: Could not read frame"
+        if fileType in ["mp4", "avi"]:
+            cap = cv.VideoCapture(filePath)
+            assert cap.isOpened(), indent + "Error: Cannot open recording %s" % fileName
 
-                m1BBox = self._findColour(frame, m1Colour)
-                m2BBox = self._findColour(frame, m2Colour)
+            ret, frame = cap.read()
+            assert ret, indent * 2 + "Error: Could not read frame"
 
-                getCoords: tuple[int, int] = lambda BBox: ((BBox[0] + BBox[2])/2 , (BBox[1] + BBox[3])/2) # (x, y)
+            m1BBox = self._findColour(frame, m1Colour)
+            m2BBox = self._findColour(frame, m2Colour)
 
-                m1Pos.append(getCoords(m1BBox))
-                m2Pos.append(getCoords(m2BBox))
+            getCoords = lambda BBox: (
+                (BBox[0] + BBox[2]) / 2,
+                (BBox[1] + BBox[3]) / 2,
+            )  # (x, y)
 
-                print(indent*2 + "Data added")
+            m1Pos.append(getCoords(m1BBox))
+            m2Pos.append(getCoords(m2BBox))
 
-                try:
-                    self.cap.release()
-                    return (m1Pos, m2Pos)
-                except Exception as e:
-                    print(indent*2 + "Error: Capture %s did not close: %s" % file, e); return -1
+            print(indent * 2 + "Data added")
 
-        print(indent + "Experiment analysed: %s\n" % self.recordingPath)
-    print("Media processed ==> Data saved")
+            try:
+                cap.release()
+                return (m1Pos, m2Pos)
+            except Exception as e:
+                print(
+                    indent * 2 + "Error: Capture '%s' did not close: %s" % fileName, e
+                )
+                return
+        print("Invalid file type %s" % fileType)
+        return
+
+        print("Media processed ==> Data saved")
