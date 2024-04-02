@@ -71,7 +71,7 @@ class MassTracker:
         print("Error: No files found")
         return -1
 
-    def processRecordings(
+    def processRecording(
         self,
         filePath: str,
         m1Colour: str,
@@ -79,7 +79,8 @@ class MassTracker:
     ) -> tuple[list, list] | None:
         m1Pos, m2Pos = [], []
 
-        experimentPath, fileName = filePath.split("/")[-2:]
+        fileName = filePath.split("/")[-1]
+        experimentPath = filePath.removesuffix(fileName)
 
         print("Searching for recordings in: '%s'..." % experimentPath)
         print(indent + "Analysing recording: '%s'..." % fileName)
@@ -115,6 +116,3 @@ class MassTracker:
                 )
                 return
         print("Invalid file type %s" % fileType)
-        return
-
-        print("Media processed ==> Data saved")

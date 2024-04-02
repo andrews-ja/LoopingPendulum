@@ -59,7 +59,7 @@ def main() -> None:
         runNum = 1
 
         for recFileName in next(os.walk(RECORDINGS_DIR / experimentFolder)):
-            massCoords: tuple[list, list] = tracker.processRecordings(
+            massCoords: tuple[list, list] = tracker.processRecording(
                 RECORDINGS_DIR / experimentFolder / recFileName, "red", "green"
             )  # ([(x, y), ...], [(x, y), ...])
             if not massCoords:
@@ -81,8 +81,10 @@ def main() -> None:
 
         # Writing CSV data
         csvFilePath = f"{DATA_DIR}/{experimentFolder}/dispData/run{runNum}.csv"
+        csvFileName = csvFilePath.split("/")[-1]
+
         with open(csvFilePath, "w") as csvFile:
-            print("Writing %s data to run%s.csv" % (experimentFolder, runNum))
+            print("Writing %s data to %s" % (experimentFolder, csvFileName))
             writer = csv.writer(csvFile)
             writer.writerow(("M1 Displacement", "M2 Displacement"))
 
@@ -90,11 +92,9 @@ def main() -> None:
                 writer.writerow((dispList[0][rowNum], dispList[1][rowNum]))
 
         # Plotting
-        print("Plotting data from %s" % csvFilePath.split("/")[-1])
+        print("Plotting data from %s" % csvFileName)
         plotter.plot(csvFilePath)
 
 
 if __name__ == "__main__":
     main()
-
-# TODO: add 'Edit CSV' to recommended extensions
